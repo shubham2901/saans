@@ -7,8 +7,11 @@ import {
   CACHE_KEYS,
   CACHE_TTL,
   storeDailyReading,
+  saveLastKnownAQI,
+  getProfiles,
 } from '../services/storageService';
 import { getAQIStatus } from '../constants/colors';
+import { scheduleNotificationsFirstTime } from '../services/notificationService';
 
 interface UseAQIInput {
   lat: number | null;
@@ -43,7 +46,7 @@ export function useAQI({ lat, lng, enabled, city }: UseAQIInput): UseAQIResult {
     async (bust = false) => {
       if (!enabled || lat === null || lng === null) return;
 
-      const aqiKey      = CACHE_KEYS.CURRENT_AQI(lat, lng);
+      const aqiKey = CACHE_KEYS.CURRENT_AQI(lat, lng);
       const forecastKey = CACHE_KEYS.HOURLY_FORECAST(lat, lng);
 
       // ── 1. Show cached data immediately ──────────────────────────────────────
@@ -89,15 +92,35 @@ export function useAQI({ lat, lng, enabled, city }: UseAQIInput): UseAQIResult {
         // Persist today's reading to history
         await storeDailyReading({
           date: todayISO(),
-          aqi:  freshAqi.aqi,
+          aqi: freshAqi.aqi,
           status: getAQIStatus(freshAqi.aqi),
         });
+
+        // Save for AppState foreground checks (spike / clean-air alerts)
+        const knownCity = freshAqi.city || freshAqi.stationName || 'your city';
+        await saveLastKnownAQI(freshAqi.aqi, knownCity);
+
+        // Schedule morning notification the first time we have a real city
+        const profiles = await getProfiles();
+        await scheduleNotificationsFirstTime(knownCity, profiles);
       } else if (!hasCachedData.current) {
         setError('Could not load air data');
       }
 
       // ── 3b. Handle forecast result ────────────────────────────────────────────
       if (freshForecast.length > 0) {
+        // Smooth Open-Meteo forecast towards WAQI current sensor reading
+        if (freshAqi) {
+          const diff = freshAqi.aqi - freshForecast[0].aqi;
+          freshForecast.forEach((f, i) => {
+            // Decay the difference linearly over the first 8 hours
+            const decay = Math.max(0, 1 - i / 8);
+            f.aqi = Math.max(0, Math.round(f.aqi + diff * decay));
+          });
+          // Also set the first hour's pollutant to the current one
+          freshForecast[0].dominantPollutant = freshAqi.dominantPollutant;
+        }
+
         await setCache(forecastKey, freshForecast, CACHE_TTL.HOURLY_FORECAST);
         setForecast(freshForecast);
       }

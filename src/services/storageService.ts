@@ -124,3 +124,25 @@ export async function getProfiles(): Promise<UserProfile[]> {
     return [];
   }
 }
+
+// ─── Last-known AQI ───────────────────────────────────────────────────────────
+// Stored whenever useAQI gets fresh data.
+// Used by App.tsx AppState listener to check spike / clean-air conditions
+// without needing a running hook.
+
+const LAST_KNOWN_AQI_KEY = 'last_known_aqi';
+
+export async function saveLastKnownAQI(aqi: number, city: string): Promise<void> {
+  try {
+    await AsyncStorage.setItem(LAST_KNOWN_AQI_KEY, JSON.stringify({ aqi, city }));
+  } catch {}
+}
+
+export async function getLastKnownAQI(): Promise<{ aqi: number; city: string } | null> {
+  try {
+    const raw = await AsyncStorage.getItem(LAST_KNOWN_AQI_KEY);
+    return raw ? (JSON.parse(raw) as { aqi: number; city: string }) : null;
+  } catch {
+    return null;
+  }
+}

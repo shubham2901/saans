@@ -14,7 +14,14 @@ import {
   getProfiles,
   saveProfiles,
   markOnboardingComplete,
+  getLastKnownAQI,
 } from '../services/storageService';
+import {
+  getNotificationSettings,
+  saveNotificationSettings,
+  morningTimeFromProfiles,
+  scheduleAllNotifications,
+} from '../services/notificationService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { UserProfile } from '../types';
 import { PROFILE_OPTIONS, TIME_SLOTS } from '../constants/onboarding';
@@ -123,6 +130,22 @@ export default function SettingsScreen() {
       return makeProfile(type, [...subTimes, ...globalTimes]);
     });
     await saveProfiles(profiles);
+
+    // Reschedule morning notification if the user hasn't manually set a custom time
+    try {
+      const notifSettings = await getNotificationSettings();
+      if (!notifSettings.morningTimeIsCustom) {
+        const { hour, minute } = morningTimeFromProfiles(profiles);
+        notifSettings.morningHour   = hour;
+        notifSettings.morningMinute = minute;
+        await saveNotificationSettings(notifSettings);
+      }
+      const lastKnown = await getLastKnownAQI();
+      if (lastKnown) {
+        await scheduleAllNotifications(notifSettings, lastKnown.city);
+      }
+    } catch {}
+
     setSaving(false);
     navigation.goBack();
   }

@@ -76,7 +76,9 @@ export default function HomeScreen() {
   const [aiLoading, setAiLoading] = React.useState(false);
   const aiFadeAnim = useRef(new Animated.Value(1)).current;
 
-  const showSkeleton = locLoading || (aqiLoading && !current);
+  // showSkeleton is true ONLY on the very first load when we have NOTHING.
+  // During a background refresh, we keep the previous data visible.
+  const showSkeleton = locLoading || (!current && aqiLoading && !error && permissionStatus !== 'denied');
   const showError = !current && !showSkeleton && !!error;
   const showDenied = permissionStatus === 'denied' && !current && !showSkeleton;
 
@@ -86,9 +88,21 @@ export default function HomeScreen() {
   const guidanceCards = aiGuidance ?? (current ? getHardcodedGuidance(current.aqi, profiles) : []);
   const aqiColor = current ? AQI_COLORS[current.status] : ORANGE;
 
+  const prevAqiRef = useRef<number | null>(null);
+  const prevProfilesHash = useRef<string | null>(null);
+
   React.useEffect(() => {
     if (current && profiles && !showSkeleton) {
+      // Determine if we should bust cache based on significant changes or manual refresh
+      const profilesHash = profiles.map(p => `${p.id}_${p.type}_${p.name}`).sort().join('|');
+      const aqiChange = prevAqiRef.current !== null && Math.abs(current.aqi - prevAqiRef.current) >= 5;
+      const profilesChanged = prevProfilesHash.current !== null && profilesHash !== prevProfilesHash.current;
+
+      // We bust if things changed significantly or if we just toggled loading from a manual refresh
+      const shouldBust = aqiChange || profilesChanged;
+
       setAiLoading(true);
+      console.log(`Home: Fetching AI Guidance (bust=${shouldBust})...`);
       claudeService.generateDailyGuidance({
         aqi: current.aqi,
         status: current.status,
@@ -99,9 +113,18 @@ export default function HomeScreen() {
         hourlyForecast: forecast,
         bestWindowHour: bestWindow ? bestWindow.startHour : null,
         timeOfDay
-      }).then(cards => {
-        if (cards !== aiGuidance) {
-          // Animate out old cards, in new ones
+      }, shouldBust).then(cards => {
+        prevAqiRef.current = current.aqi;
+        prevProfilesHash.current = profilesHash;
+        console.log('Home: Received AI cards', cards.length);
+
+        // Deep comparison or at least length-based to avoid redundant animations
+        const isSame = aiGuidance &&
+          cards.length === aiGuidance.length &&
+          cards.every((c, i) => c.message === aiGuidance[i].message);
+
+        if (!isSame) {
+          console.log('Home: Updating AI cards with animation');
           Animated.timing(aiFadeAnim, {
             toValue: 0,
             duration: 150,
@@ -116,10 +139,12 @@ export default function HomeScreen() {
             }).start();
           });
         } else {
+          console.log('Home: AI cards identical to current state, skipping animation');
           setAiLoading(false);
         }
-      }).catch(() => {
-        setAiLoading(false); // Fallback to hardcoded
+      }).catch(err => {
+        console.log('Home: Error fetching AI guidance', err);
+        setAiLoading(false);
       });
     }
   }, [current, profiles, showSkeleton]);

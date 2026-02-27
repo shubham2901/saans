@@ -26,11 +26,11 @@ interface CityEntry { city: string; aqi: number | null }
 // ─── 7-day gap-fill ───────────────────────────────────────────────────────────
 
 interface FilledDay {
-  date:           string;
-  aqi:            number;
-  status:         string;
+  date: string;
+  aqi: number;
+  status: string;
   isInterpolated: boolean;
-  label:          string; // "Mon", "Tue~"
+  label: string; // "Mon", "Tue~"
 }
 
 function getLast7Dates(): string[] {
@@ -68,21 +68,21 @@ function fillGaps(dates: string[], history: StoredDayReading[]): FilledDay[] {
       if (raw[j].aqi !== null) { next = raw[j].aqi; break; }
     }
 
-    if      (prev !== null && next !== null) raw[i].aqi = Math.round((prev + next) / 2);
-    else if (prev !== null)                  raw[i].aqi = prev;
-    else if (next !== null)                  raw[i].aqi = next;
-    else                                     raw[i].aqi = 50;
+    if (prev !== null && next !== null) raw[i].aqi = Math.round((prev + next) / 2);
+    else if (prev !== null) raw[i].aqi = prev;
+    else if (next !== null) raw[i].aqi = next;
+    else raw[i].aqi = 50;
   }
 
   return raw.map((r) => {
-    const aqi    = r.aqi!;
+    const aqi = r.aqi!;
     const interp = !map.has(r.date);
     return {
-      date:           r.date,
+      date: r.date,
       aqi,
-      status:         getAQIStatus(aqi),
+      status: getAQIStatus(aqi),
       isInterpolated: interp,
-      label:          shortDay(r.date) + (interp ? '~' : ''),
+      label: shortDay(r.date) + (interp ? '~' : ''),
     };
   });
 }
@@ -93,9 +93,9 @@ interface WeekStats { avgAqi: number; avgStatus: string; worstDay: FilledDay; be
 
 function calcStats(days: FilledDay[]): WeekStats | null {
   if (days.length === 0) return null;
-  const avg   = Math.round(days.reduce((s, d) => s + d.aqi, 0) / days.length);
+  const avg = Math.round(days.reduce((s, d) => s + d.aqi, 0) / days.length);
   const worst = days.reduce((a, b) => (a.aqi > b.aqi ? a : b));
-  const best  = days.reduce((a, b) => (a.aqi < b.aqi ? a : b));
+  const best = days.reduce((a, b) => (a.aqi < b.aqi ? a : b));
   return { avgAqi: avg, avgStatus: getAQIStatus(avg), worstDay: worst, bestDay: best };
 }
 
@@ -110,14 +110,14 @@ function StatRow({ label, value, color }: { label: string; value: string; color:
   );
 }
 const sStyle = StyleSheet.create({
-  row:   { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 7 },
+  row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 7 },
   label: { fontSize: 14, color: '#555' },
   value: { fontSize: 14, fontWeight: '700', textAlign: 'right', flex: 1, marginLeft: 12 },
 });
 
 function CityRow({ entry, isUser, rank }: { entry: CityEntry; isUser: boolean; rank: number }) {
-  const status    = entry.aqi !== null ? getAQIStatus(entry.aqi) : null;
-  const dotColor  = status ? AQI_COLORS[status]       : '#CCC'; // bright fill for the dot
+  const status = entry.aqi !== null ? getAQIStatus(entry.aqi) : null;
+  const dotColor = status ? AQI_COLORS[status] : '#CCC'; // bright fill for the dot
   const textColor = status ? (AQI_DARK_COLORS[status] ?? '#555') : '#CCC'; // readable for text
   return (
     <View style={[cStyle.row, isUser && cStyle.rowActive]}>
@@ -129,13 +129,13 @@ function CityRow({ entry, isUser, rank }: { entry: CityEntry; isUser: boolean; r
   );
 }
 const cStyle = StyleSheet.create({
-  row:       { flexDirection: 'row', alignItems: 'center', paddingVertical: 11, paddingHorizontal: 14, borderRadius: 10, gap: 10 },
+  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 11, paddingHorizontal: 14, borderRadius: 10, gap: 10 },
   rowActive: { backgroundColor: '#FFF3E8' },
-  rank:      { width: 20, fontSize: 13, color: '#BBB', fontWeight: '600' },
-  dot:       { width: 12, height: 12, borderRadius: 6 },
-  name:      { flex: 1, fontSize: 14, color: '#333', fontWeight: '500' },
-  nameActive:{ color: ORANGE, fontWeight: '700' },
-  aqi:       { fontSize: 14, fontWeight: '800' },
+  rank: { width: 20, fontSize: 13, color: '#BBB', fontWeight: '600' },
+  dot: { width: 12, height: 12, borderRadius: 6 },
+  name: { flex: 1, fontSize: 14, color: '#333', fontWeight: '500' },
+  nameActive: { color: ORANGE, fontWeight: '700' },
+  aqi: { fontSize: 14, fontWeight: '800' },
 });
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -143,13 +143,13 @@ const cStyle = StyleSheet.create({
 export default function TrendsScreen() {
   const { city, lat, lng } = useLocation();
 
-  const [days,          setDays]          = useState<FilledDay[]>([]);
-  const [historyCount,  setHistoryCount]  = useState(0);
-  const [loadingChart,  setLoadingChart]  = useState(true);
-  const [cities,        setCities]        = useState<CityEntry[]>([]);
+  const [days, setDays] = useState<FilledDay[]>([]);
+  const [historyCount, setHistoryCount] = useState(0);
+  const [loadingChart, setLoadingChart] = useState(true);
+  const [cities, setCities] = useState<CityEntry[]>([]);
   const [loadingCities, setLoadingCities] = useState(true);
-  const [activeBar,     setActiveBar]     = useState<number | null>(null);
-  const [refreshing,    setRefreshing]    = useState(false);
+  const [activeBar, setActiveBar] = useState<number | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   // ── Chart loader ────────────────────────────────────────────────────────────
   // Fetches 7 days of historical AQI from Open-Meteo (no app-opens needed),
@@ -165,7 +165,7 @@ export default function TrendsScreen() {
     let apiHistory: StoredDayReading[] = [];
     if (lat !== null && lng !== null) {
       const cacheKey = CACHE_KEYS.HISTORICAL_AQI(lat, lng);
-      const cached   = !bust ? await getCache<StoredDayReading[]>(cacheKey) : null;
+      const cached = !bust ? await getCache<StoredDayReading[]>(cacheKey) : null;
       if (cached) {
         apiHistory = cached;
       } else {
@@ -179,7 +179,7 @@ export default function TrendsScreen() {
     // 3. Merge: API overwrites local for the same date (API is authoritative)
     const mergedMap = new Map<string, StoredDayReading>();
     localHistory.forEach((r) => mergedMap.set(r.date, r));
-    apiHistory.forEach((r)   => mergedMap.set(r.date, r));
+    apiHistory.forEach((r) => mergedMap.set(r.date, r));
     const merged = Array.from(mergedMap.values());
 
     setHistoryCount(merged.length);
@@ -220,12 +220,12 @@ export default function TrendsScreen() {
   const userCityNorm = city?.toLowerCase().trim() ?? '';
   // hasData: at least 1 real data point exists (from API or local)
   const hasData = historyCount > 0;
-  const stats   = calcStats(days);
+  const stats = calcStats(days);
 
   // Bar chart data — topLabelComponent is re-evaluated on every render (activeBar in closure)
   const barData = days.map((d, i) => ({
-    value:      d.aqi,
-    label:      d.label,
+    value: d.aqi,
+    label: d.label,
     frontColor: AQI_COLORS[getAQIStatus(d.aqi)],
     topLabelComponent: () =>
       activeBar === i
@@ -310,7 +310,7 @@ export default function TrendsScreen() {
         {/* ── City Comparison ── */}
         <View style={styles.citySection}>
           <Text style={styles.sectionTitle}>How does your city compare?</Text>
-          <Text style={styles.sectionSub}>Right now · cleanest first</Text>
+          <Text style={styles.sectionSub}>City averages right now · cleanest first</Text>
 
           {loadingCities ? (
             COMPARE_CITIES.map((c) => (
@@ -323,7 +323,7 @@ export default function TrendsScreen() {
           ) : (
             <View style={styles.cityList}>
               {cities.map((entry, i) => {
-                const norm   = entry.city.toLowerCase();
+                const norm = entry.city.toLowerCase();
                 const isUser = !!userCityNorm && (norm === userCityNorm || userCityNorm.includes(norm) || norm.includes(userCityNorm));
                 return <CityRow key={entry.city} entry={entry} isUser={isUser} rank={i + 1} />;
               })}
@@ -338,15 +338,15 @@ export default function TrendsScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  root:   { flex: 1, backgroundColor: '#F7F8FA' },
+  root: { flex: 1, backgroundColor: '#F7F8FA' },
   scroll: { padding: 16, paddingBottom: 40 },
 
-  header:      { marginBottom: 20 },
+  header: { marginBottom: 20 },
   headerTitle: { fontSize: 26, fontWeight: '800', color: '#1A1A1A' },
-  headerSub:   { fontSize: 13, color: '#888', marginTop: 2 },
+  headerSub: { fontSize: 13, color: '#888', marginTop: 2 },
 
   sectionTitle: { fontSize: 15, fontWeight: '700', color: '#1A1A1A', marginBottom: 4 },
-  sectionSub:   { fontSize: 12, color: '#999', marginBottom: 12 },
+  sectionSub: { fontSize: 12, color: '#999', marginBottom: 12 },
 
   // Chart card
   chartCard: {
@@ -354,18 +354,18 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2,
   },
   chartHint: { fontSize: 11, color: '#AAA', marginBottom: 14 },
-  xLabel:    { color: '#888', fontSize: 11 },
-  statsBox:  { marginTop: 16, borderTopWidth: 1, borderTopColor: '#F0F0F0', paddingTop: 12 },
-  divider:   { height: 1, backgroundColor: '#F5F5F5' },
+  xLabel: { color: '#888', fontSize: 11 },
+  statsBox: { marginTop: 16, borderTopWidth: 1, borderTopColor: '#F0F0F0', paddingTop: 12 },
+  divider: { height: 1, backgroundColor: '#F5F5F5' },
 
   // No data / error state
-  noDataBox:  {
+  noDataBox: {
     backgroundColor: '#FFF', borderRadius: 18, padding: 28, alignItems: 'center', marginBottom: 24,
     shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
   },
-  noDataEmoji:{ fontSize: 40, marginBottom: 12 },
-  noDataTitle:{ fontSize: 17, fontWeight: '700', color: '#1A1A1A', marginBottom: 8, textAlign: 'center' },
-  noDataSub:  { fontSize: 14, color: '#888', textAlign: 'center', lineHeight: 22 },
+  noDataEmoji: { fontSize: 40, marginBottom: 12 },
+  noDataTitle: { fontSize: 17, fontWeight: '700', color: '#1A1A1A', marginBottom: 8, textAlign: 'center' },
+  noDataSub: { fontSize: 14, color: '#888', textAlign: 'center', lineHeight: 22 },
 
   // City comparison
   citySection: {
@@ -373,8 +373,8 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 2,
   },
   cityList: { gap: 2 },
-  skeletonRow:  { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 14, gap: 10 },
-  skeletonDot:  { width: 12, height: 12, borderRadius: 6, backgroundColor: '#EEE' },
+  skeletonRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 14, gap: 10 },
+  skeletonDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#EEE' },
   skeletonText: { flex: 1, height: 14, borderRadius: 4, backgroundColor: '#EEE' },
-  skeletonNum:  { width: 32, height: 14, borderRadius: 4, backgroundColor: '#EEE' },
+  skeletonNum: { width: 32, height: 14, borderRadius: 4, backgroundColor: '#EEE' },
 });
