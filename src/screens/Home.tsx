@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   RefreshControl,
   StyleSheet,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -15,21 +16,22 @@ import { useProfiles } from '../hooks/useProfiles';
 import AQICard from '../components/AQICard';
 import GuidanceCard from '../components/GuidanceCard';
 import SkeletonCard from '../components/SkeletonCard';
+import { claudeService } from '../services/claudeService';
 import { AQI_COLORS } from '../constants/colors';
 import { getHardcodedGuidance } from '../constants/thresholds';
-import { HourlyForecast } from '../types';
+import { HourlyForecast, GuidanceCard as GuidanceCardType } from '../types';
 
 const ORANGE = '#FF7E00';
 
-function getGreeting(): string {
+function getGreeting(): { text: string; timeOfDay: 'morning' | 'afternoon' | 'evening' } {
   const h = new Date().getHours();
-  if (h < 12) return 'Good morning';
-  if (h < 17) return 'Good afternoon';
-  return 'Good evening';
+  if (h < 12) return { text: 'Good morning', timeOfDay: 'morning' };
+  if (h < 17) return { text: 'Good afternoon', timeOfDay: 'afternoon' };
+  return { text: 'Good evening', timeOfDay: 'evening' };
 }
 
 function formatHour(h: number): string {
-  if (h === 0)  return '12am';
+  if (h === 0) return '12am';
   if (h === 12) return '12pm';
   return h < 12 ? `${h}am` : `${h - 12}pm`;
 }
@@ -49,7 +51,7 @@ function findBestWindow(forecast: HourlyForecast[]): BestWindow | null {
 }
 
 function aqiDotColor(aqi: number): string {
-  if (aqi <= 50)  return AQI_COLORS.Good;
+  if (aqi <= 50) return AQI_COLORS.Good;
   if (aqi <= 100) return AQI_COLORS.Moderate;
   if (aqi <= 150) return AQI_COLORS.UnhealthySensitive;
   if (aqi <= 200) return AQI_COLORS.Unhealthy;
@@ -63,14 +65,58 @@ export default function HomeScreen() {
     lat, lng, city, enabled: permissionStatus === 'granted',
   });
   const { profiles } = useProfiles();
+  const [aiGuidance, setAiGuidance] = React.useState<GuidanceCardType[] | null>(null);
+  const [aiLoading, setAiLoading] = React.useState(false);
+  const aiFadeAnim = useRef(new Animated.Value(1)).current;
 
-const showSkeleton = locLoading || (aqiLoading && !current);
-  const showError    = !current && !showSkeleton && !!error;
-  const showDenied   = permissionStatus === 'denied' && !current && !showSkeleton;
+  const showSkeleton = locLoading || (aqiLoading && !current);
+  const showError = !current && !showSkeleton && !!error;
+  const showDenied = permissionStatus === 'denied' && !current && !showSkeleton;
 
-  const guidanceCards = current ? getHardcodedGuidance(current.aqi, profiles) : [];
-  const aqiColor      = current ? AQI_COLORS[current.status] : ORANGE;
-  const bestWindow    = forecast.length >= 2 ? findBestWindow(forecast) : null;
+  const { text: greetingText, timeOfDay } = getGreeting();
+
+  const bestWindow = forecast.length >= 2 ? findBestWindow(forecast) : null;
+  const guidanceCards = aiGuidance ?? (current ? getHardcodedGuidance(current.aqi, profiles) : []);
+  const aqiColor = current ? AQI_COLORS[current.status] : ORANGE;
+
+  React.useEffect(() => {
+    if (current && profiles && !showSkeleton) {
+      setAiLoading(true);
+      claudeService.generateDailyGuidance({
+        aqi: current.aqi,
+        status: current.status,
+        dominantPollutant: current.dominantPollutant,
+        pm25: current.pm25,
+        city: city ?? 'Unknown',
+        profiles,
+        hourlyForecast: forecast,
+        bestWindowHour: bestWindow ? Math.floor(bestWindow.avgAqi) : null, // best approximation from available data
+        timeOfDay
+      }).then(cards => {
+        if (cards !== aiGuidance) {
+          // Animate out old cards, in new ones
+          Animated.timing(aiFadeAnim, {
+            toValue: 0,
+            duration: 150,
+            useNativeDriver: true,
+          }).start(() => {
+            setAiGuidance(cards);
+            setAiLoading(false);
+            Animated.timing(aiFadeAnim, {
+              toValue: 1,
+              duration: 150,
+              useNativeDriver: true,
+            }).start();
+          });
+        } else {
+          setAiLoading(false);
+        }
+      }).catch(() => {
+        setAiLoading(false); // Fallback to hardcoded
+      });
+    }
+  }, [current, profiles, showSkeleton]);
+
 
   const staleHoursAgo = current?.isStale
     ? Math.round((Date.now() - new Date(current.updatedAt).getTime()) / 3_600_000)
@@ -97,7 +143,7 @@ const showSkeleton = locLoading || (aqiLoading && !current);
         {/* ── Header ── */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <Text style={styles.greeting}>{getGreeting()}</Text>
+            <Text style={styles.greeting}>{greetingText}</Text>
             <Text style={styles.city} numberOfLines={1}>{locationLine}</Text>
           </View>
           <View style={styles.headerActions}>
@@ -117,9 +163,9 @@ const showSkeleton = locLoading || (aqiLoading && !current);
         {showSkeleton && (
           <>
             <SkeletonCard height={220} style={styles.mb16} />
-            <SkeletonCard height={70}  style={styles.mb10} />
-            <SkeletonCard height={70}  style={styles.mb10} />
-            <SkeletonCard height={70}  style={styles.mb10} />
+            <SkeletonCard height={70} style={styles.mb10} />
+            <SkeletonCard height={70} style={styles.mb10} />
+            <SkeletonCard height={70} style={styles.mb10} />
           </>
         )}
 
@@ -177,7 +223,19 @@ const showSkeleton = locLoading || (aqiLoading && !current);
               </TouchableOpacity>
             )}
 
-            <Text style={styles.sectionTitle}>Your Guide Today</Text>
+            <View style={styles.sectionTitleRow}>
+              <Text style={styles.sectionTitle}>Your Guide Today</Text>
+              {aiLoading && <Text style={styles.aiLoadingText}>✨ Loading AI...</Text>}
+              {!aiLoading && aiGuidance !== null && (
+                <TouchableOpacity
+                  style={styles.aiChip}
+                  activeOpacity={0.7}
+                  onPress={() => alert('Personalized by AI based on your profiles')} // Note: ideally a nice toast or modal
+                >
+                  <Text style={styles.aiChipText}>✨ AI</Text>
+                </TouchableOpacity>
+              )}
+            </View>
 
             {profiles.length === 0 ? (
               <TouchableOpacity
@@ -190,9 +248,11 @@ const showSkeleton = locLoading || (aqiLoading && !current);
                 </Text>
               </TouchableOpacity>
             ) : (
-              guidanceCards.map((card, i) => (
-                <GuidanceCard key={i} data={card} aqiColor={aqiColor} />
-              ))
+              <Animated.View style={{ opacity: aiFadeAnim }}>
+                {guidanceCards.map((card, i) => (
+                  <GuidanceCard key={i} data={card} aqiColor={aqiColor} />
+                ))}
+              </Animated.View>
             )}
           </>
         )}
@@ -202,16 +262,16 @@ const showSkeleton = locLoading || (aqiLoading && !current);
 }
 
 const styles = StyleSheet.create({
-  root:   { flex: 1, backgroundColor: '#F7F8FA' },
+  root: { flex: 1, backgroundColor: '#F7F8FA' },
   scroll: { padding: 16, paddingBottom: 32 },
-  mb16:   { marginBottom: 16 },
-  mb10:   { marginBottom: 10 },
+  mb16: { marginBottom: 16 },
+  mb10: { marginBottom: 10 },
   spacer: { height: 16 },
 
-  header:        { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  headerLeft:    { flex: 1, marginRight: 8 },
-  greeting:      { fontSize: 14, color: '#888', fontWeight: '500', marginBottom: 2 },
-  city:          { fontSize: 22, fontWeight: '700', color: ORANGE },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  headerLeft: { flex: 1, marginRight: 8 },
+  greeting: { fontSize: 14, color: '#888', fontWeight: '500', marginBottom: 2 },
+  city: { fontSize: 22, fontWeight: '700', color: ORANGE },
   headerActions: { flexDirection: 'row', gap: 8 },
   iconBtn: {
     width: 40, height: 40, borderRadius: 20,
@@ -239,20 +299,24 @@ const styles = StyleSheet.create({
     paddingVertical: 12, paddingHorizontal: 16, marginBottom: 20,
     shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 1, gap: 10,
   },
-  bestTimeDot:       { width: 10, height: 10, borderRadius: 5 },
-  bestTimeText:      { flex: 1, fontSize: 14, color: '#444' },
+  bestTimeDot: { width: 10, height: 10, borderRadius: 5 },
+  bestTimeText: { flex: 1, fontSize: 14, color: '#444' },
   bestTimeHighlight: { fontWeight: '700', color: '#1A1A1A' },
-  bestTimeChevron:   { fontSize: 18, color: '#CCC' },
+  bestTimeChevron: { fontSize: 18, color: '#CCC' },
 
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#1A1A1A', marginBottom: 12 },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#1A1A1A' },
+  aiLoadingText: { fontSize: 13, color: '#888', fontStyle: 'italic' },
+  aiChip: { backgroundColor: '#F0E6FF', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  aiChipText: { fontSize: 12, fontWeight: '600', color: '#7E3FE4' },
 
-  centerBox:  { alignItems: 'center', paddingVertical: 60, paddingHorizontal: 32 },
-  errorIcon:  { fontSize: 56, marginBottom: 16 },
+  centerBox: { alignItems: 'center', paddingVertical: 60, paddingHorizontal: 32 },
+  errorIcon: { fontSize: 56, marginBottom: 16 },
   errorTitle: { fontSize: 18, fontWeight: '700', color: '#1A1A1A', marginBottom: 8, textAlign: 'center' },
-  errorSub:   { fontSize: 14, color: '#888', textAlign: 'center', lineHeight: 20 },
-  retryBtn:   { marginTop: 24, backgroundColor: ORANGE, paddingHorizontal: 28, paddingVertical: 13, borderRadius: 12 },
-  retryText:  { fontSize: 15, fontWeight: '700', color: '#FFF' },
+  errorSub: { fontSize: 14, color: '#888', textAlign: 'center', lineHeight: 20 },
+  retryBtn: { marginTop: 24, backgroundColor: ORANGE, paddingHorizontal: 28, paddingVertical: 13, borderRadius: 12 },
+  retryText: { fontSize: 15, fontWeight: '700', color: '#FFF' },
 
-  noProfilesBox:  { backgroundColor: '#FFF3E8', borderRadius: 14, padding: 18, alignItems: 'center', borderWidth: 1, borderColor: '#FFD9B0' },
+  noProfilesBox: { backgroundColor: '#FFF3E8', borderRadius: 14, padding: 18, alignItems: 'center', borderWidth: 1, borderColor: '#FFD9B0' },
   noProfilesText: { fontSize: 14, color: ORANGE, textAlign: 'center', lineHeight: 20, fontWeight: '600' },
 });
