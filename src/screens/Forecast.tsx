@@ -171,7 +171,7 @@ export default function ForecastScreen() {
   const { width } = useWindowDimensions();
   const { lat, lng, city, subArea, permissionStatus } = useLocation();
   const { forecast, loading, refresh } = useAQI({
-    lat, lng, city, enabled: permissionStatus === 'granted',
+    lat, lng, city, enabled: lat !== null && lng !== null,
   });
   const { profiles } = useProfiles();
 

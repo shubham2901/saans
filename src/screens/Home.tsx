@@ -69,18 +69,17 @@ export default function HomeScreen() {
   const navigation = useNavigation();
   const { lat, lng, city, subArea, permissionStatus, loading: locLoading } = useLocation();
   const { current, forecast, loading: aqiLoading, error, refresh } = useAQI({
-    lat, lng, city, enabled: permissionStatus === 'granted',
+    lat, lng, city, enabled: lat !== null && lng !== null,
   });
   const { profiles } = useProfiles();
   const [aiGuidance, setAiGuidance] = React.useState<GuidanceCardType[] | null>(null);
   const [aiLoading, setAiLoading] = React.useState(false);
   const aiFadeAnim = useRef(new Animated.Value(1)).current;
 
-  // showSkeleton is true ONLY on the very first load when we have NOTHING.
-  // During a background refresh, we keep the previous data visible.
-  const showSkeleton = locLoading || (!current && aqiLoading && !error && permissionStatus !== 'denied');
-  const showError = !current && !showSkeleton && !!error;
-  const showDenied = permissionStatus === 'denied' && !current && !showSkeleton;
+  // showSkeleton: true while location resolving OR waiting for first AQI load
+  const showSkeleton = locLoading || (!current && (aqiLoading || (lat === null && permissionStatus !== 'denied')));
+  const showError    = !current && !showSkeleton && !!error;
+  const showDenied   = permissionStatus === 'denied' && lat === null && !showSkeleton;
 
   const { text: greetingText, timeOfDay } = getGreeting();
 

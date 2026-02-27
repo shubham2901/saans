@@ -100,7 +100,8 @@ export function useLocation() {
         if (ipResult && !cancelled) {
           const locData = { lat: ipResult.lat, lng: ipResult.lng, city: ipResult.city, subArea: null };
           await setCache<CachedLocation>(CACHE_KEYS.LOCATION, locData, CACHE_TTL.LOCATION);
-          setState({ ...locData, permissionStatus: 'denied', loading: false, error: null });
+          // Treat IP fallback as 'granted' so AQI loading is enabled
+          setState({ ...locData, permissionStatus: 'granted', loading: false, error: null });
         } else if (!cancelled) {
           setState({
             lat: null, lng: null, city: null, subArea: null,
