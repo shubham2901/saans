@@ -8,7 +8,7 @@ export interface LocationState {
   lat: number | null;
   lng: number | null;
   city: string | null;
-  subArea: string | null; // neighbourhood / district (e.g. "Indiranagar")
+  subArea: string | null;
   permissionStatus: PermissionStatus;
   loading: boolean;
   error: string | null;
@@ -19,6 +19,42 @@ interface CachedLocation {
   lng: number;
   city: string;
   subArea: string | null;
+}
+
+// GPS timeout — if the emulator / device can't get a fix within this many ms,
+// fall through to the IP-geolocation fallback.
+const GPS_TIMEOUT_MS = 8_000;
+
+async function resolveByGPS(): Promise<{ lat: number; lng: number } | null> {
+  try {
+    const position = await Promise.race<Location.LocationObject | null>([
+      Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), GPS_TIMEOUT_MS)),
+    ]);
+    if (!position) return null;
+    return { lat: position.coords.latitude, lng: position.coords.longitude };
+  } catch {
+    return null;
+  }
+}
+
+async function resolveByIP(): Promise<{ lat: number; lng: number; city: string } | null> {
+  try {
+    const res  = await fetch('https://ipapi.co/json/');
+    const data = await res.json() as {
+      latitude?: number; longitude?: number; city?: string;
+    };
+    if (data.latitude && data.longitude) {
+      return {
+        lat:  data.latitude,
+        lng:  data.longitude,
+        city: data.city ?? 'Unknown',
+      };
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 export function useLocation() {
@@ -36,7 +72,7 @@ export function useLocation() {
     let cancelled = false;
 
     async function resolve() {
-      // 1. Return cached location immediately if still fresh (30 min TTL)
+      // ── 1. Return cached location immediately if still fresh (30 min TTL) ──
       const cached = await getCache<CachedLocation>(CACHE_KEYS.LOCATION);
       if (cached && !cancelled) {
         setState({
@@ -51,20 +87,23 @@ export function useLocation() {
         return;
       }
 
-      // 2. Request foreground permission
+      // ── 2. Request foreground permission ────────────────────────────────────
       const { status } = await Location.requestForegroundPermissionsAsync();
       const permissionStatus: PermissionStatus =
         status === 'granted' ? 'granted'
-        : status === 'denied' ? 'denied'
+        : status === 'denied'  ? 'denied'
         : 'undetermined';
 
       if (status !== 'granted') {
-        if (!cancelled) {
+        // Permission denied — try silent IP fallback (no permission needed)
+        const ipResult = await resolveByIP();
+        if (ipResult && !cancelled) {
+          const locData = { lat: ipResult.lat, lng: ipResult.lng, city: ipResult.city, subArea: null };
+          await setCache<CachedLocation>(CACHE_KEYS.LOCATION, locData, CACHE_TTL.LOCATION);
+          setState({ ...locData, permissionStatus: 'denied', loading: false, error: null });
+        } else if (!cancelled) {
           setState({
-            lat: null,
-            lng: null,
-            city: null,
-            subArea: null,
+            lat: null, lng: null, city: null, subArea: null,
             permissionStatus,
             loading: false,
             error: 'Location permission denied. Enable it in Settings to get local AQI.',
@@ -73,61 +112,59 @@ export function useLocation() {
         return;
       }
 
-      // 3. Get current GPS position
-      let position: Location.LocationObject;
-      try {
-        position = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
-      } catch {
-        if (!cancelled) {
-          setState((prev) => ({
-            ...prev,
-            permissionStatus: 'granted',
-            loading: false,
-            error: 'Could not determine your location. Try again.',
-          }));
-        }
-        return;
-      }
+      // ── 3. Try GPS (with timeout) ────────────────────────────────────────────
+      const gpsResult = await resolveByGPS();
 
-      const lat = position.coords.latitude;
-      const lng = position.coords.longitude;
-
-      // 4. Reverse geocode to get city + neighbourhood
+      let lat: number;
+      let lng: number;
       let city    = 'Unknown';
       let subArea: string | null = null;
-      try {
-        const [place] = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
 
-        // City: most specific populated locality name
-        city =
-          place?.city ??
-          place?.district ??
-          place?.subregion ??
-          place?.region ??
-          'Unknown';
+      if (gpsResult) {
+        lat = gpsResult.lat;
+        lng = gpsResult.lng;
 
-        // Sub-area: neighbourhood / district (must differ from city to be useful)
-        const rawSubArea = place?.district ?? place?.subregion ?? null;
-        subArea = rawSubArea && rawSubArea !== city ? rawSubArea : null;
-      } catch {
-        // Non-fatal — city remains 'Unknown', subArea null
+        // ── 4. Reverse geocode ────────────────────────────────────────────────
+        try {
+          const [place] = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng });
+          city =
+            place?.city ??
+            place?.district ??
+            place?.subregion ??
+            place?.region ??
+            'Unknown';
+          const rawSubArea = place?.district ?? place?.subregion ?? null;
+          subArea = rawSubArea && rawSubArea !== city ? rawSubArea : null;
+        } catch {
+          // non-fatal — city stays 'Unknown'
+        }
+      } else {
+        // ── 5. GPS failed / timed out → fall back to IP geolocation ──────────
+        const ipResult = await resolveByIP();
+        if (!ipResult) {
+          if (!cancelled) {
+            setState((prev) => ({
+              ...prev,
+              permissionStatus: 'granted',
+              loading: false,
+              error: 'Could not determine your location. Try again.',
+            }));
+          }
+          return;
+        }
+        lat    = ipResult.lat;
+        lng    = ipResult.lng;
+        city   = ipResult.city;
+        subArea = null;
       }
 
-      // 5. Cache result for 30 minutes
-      await setCache<CachedLocation>(
-        CACHE_KEYS.LOCATION,
-        { lat, lng, city, subArea },
-        CACHE_TTL.LOCATION,
-      );
+      // ── 6. Cache result for 30 minutes ──────────────────────────────────────
+      const locData = { lat, lng, city, subArea };
+      await setCache<CachedLocation>(CACHE_KEYS.LOCATION, locData, CACHE_TTL.LOCATION);
 
       if (!cancelled) {
         setState({
-          lat,
-          lng,
-          city,
-          subArea,
+          ...locData,
           permissionStatus: 'granted',
           loading: false,
           error: null,
