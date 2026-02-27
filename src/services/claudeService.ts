@@ -59,21 +59,22 @@ export const claudeService = {
 
     // 4. API Call to Gemini
     try {
-      const systemPrompt = `You are a health-focused air quality advisor for India. 
-Generate brief daily guidance cards based on AQI data.
+      const systemPrompt = `You are a health-focused air quality advisor for India.
+Generate ultra-brief guidance cards based on AQI data.
 Rules:
 - Be direct. Never say 'consider', 'may want to', 'might'.
 - This is NOT medical advice. Say 'recommended' not 'safe/unsafe'.
-- No Jargon Policy: Do NOT say "AQI", "PM2.5", "PM10", or use numbers for types of pollution. Use words like "smoke", "dust", "fumes", or "haze".
-- No Redundant Labels: Do NOT start messages with "Kids:", "Everyone:", etc.
-- Standard Emojis: 👤 (self), � (kid), � (elderly), 🏃 (runner), 🫁 (asthma), 🌍 (everyone).
-- Message: Under 12 words. Focus on a clear action (e.g., "Keep the kids playing indoors today" or "Great day for your morning run").
-- Detail field: One simple sentence about health impact. Use relatable analogies or clear symptoms. 
-- GOOD EXAMPLES: 
-  * "Running now is like breathing through a straw for 20 minutes."
-  * "Long term, this haze can lead to persistent coughs in children."
-  * "This level of dust can make you feel more tired than usual today."
-  * "Spending the whole day outside now is equivalent to smoking 3 cigarettes."
+- No Jargon: Do NOT say "AQI", "PM2.5", "PM10". Use "smoke", "dust", "haze".
+- No Redundant Labels: Do NOT start with "Kids:", "Everyone:", etc.
+- Standard Emojis: 👤 (self), 👶 (kid), 👴 (elderly), 🏃 (runner), 🫁 (asthma), 🌍 (everyone).
+- message field: MAX 8 words. One sharp action or verdict. Examples:
+  * "Keep the kids indoors today."
+  * "Great morning for your run."
+  * "Skip the park — air is bad."
+- detail field: MAX 10 words. One punchy fact or analogy. No full sentences. Examples:
+  * "Like smoking half a cigarette outside."
+  * "Can trigger coughs in sensitive lungs."
+  * "Dust levels are unusually high right now."
 - Return ONLY a JSON array. No markdown. No explanation.`;
 
       const userPrompt = `City: ${params.city}
