@@ -3,7 +3,6 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import HomeScreen from '../screens/Home';
 import ForecastScreen from '../screens/Forecast';
-import FamilyScreen from '../screens/Family';
 import TrendsScreen from '../screens/Trends';
 
 const Tab = createBottomTabNavigator();
@@ -39,13 +38,6 @@ export default function TabNavigator() {
         options={{
           headerShown: false,
           tabBarIcon: tabIcon('partly-sunny', 'partly-sunny-outline'),
-        }}
-      />
-      <Tab.Screen
-        name="Family"
-        component={FamilyScreen}
-        options={{
-          tabBarIcon: tabIcon('people', 'people-outline'),
         }}
       />
       <Tab.Screen

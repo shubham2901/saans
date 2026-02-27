@@ -78,55 +78,54 @@ export function useAQI({ lat, lng, enabled, city }: UseAQIInput): UseAQIResult {
         setLoading(true);
       }
 
-      const [freshAqi, freshForecast] = await Promise.all([
-        fetchCurrentAQI(lat, lng, city ?? undefined), // pass city for station matching
-        fetchHourlyForecast(lat, lng),
-      ]);
+      try {
+        const [freshAqi, freshForecast] = await Promise.all([
+          fetchCurrentAQI(lat, lng, city ?? undefined),
+          fetchHourlyForecast(lat, lng),
+        ]);
 
-      // ── 3a. Handle AQI result ─────────────────────────────────────────────────
-      if (freshAqi) {
-        await setCache(aqiKey, freshAqi, CACHE_TTL.CURRENT_AQI);
-        setCurrent(freshAqi);
-        setError(null);
-
-        // Persist today's reading to history
-        await storeDailyReading({
-          date: todayISO(),
-          aqi: freshAqi.aqi,
-          status: getAQIStatus(freshAqi.aqi),
-        });
-
-        // Save for AppState foreground checks (spike / clean-air alerts)
-        const knownCity = freshAqi.city || freshAqi.stationName || 'your city';
-        await saveLastKnownAQI(freshAqi.aqi, knownCity);
-
-        // Schedule morning notification the first time we have a real city
-        const profiles = await getProfiles();
-        await scheduleNotificationsFirstTime(knownCity, profiles);
-      } else if (!hasCachedData.current) {
-        setError('Could not load air data');
-      }
-
-      // ── 3b. Handle forecast result ────────────────────────────────────────────
-      if (freshForecast.length > 0) {
-        // Smooth Open-Meteo forecast towards WAQI current sensor reading
+        // ── 3a. Handle AQI result ───────────────────────────────────────────────
         if (freshAqi) {
-          const diff = freshAqi.aqi - freshForecast[0].aqi;
-          freshForecast.forEach((f, i) => {
-            // Decay the difference linearly over the first 8 hours
-            const decay = Math.max(0, 1 - i / 8);
-            f.aqi = Math.max(0, Math.round(f.aqi + diff * decay));
+          await setCache(aqiKey, freshAqi, CACHE_TTL.CURRENT_AQI);
+          setCurrent(freshAqi);
+          setError(null);
+
+          await storeDailyReading({
+            date: todayISO(),
+            aqi: freshAqi.aqi,
+            status: getAQIStatus(freshAqi.aqi),
           });
-          // Also set the first hour's pollutant to the current one
-          freshForecast[0].dominantPollutant = freshAqi.dominantPollutant;
+
+          const knownCity = freshAqi.city || freshAqi.stationName || 'your city';
+          await saveLastKnownAQI(freshAqi.aqi, knownCity);
+
+          const profiles = await getProfiles();
+          await scheduleNotificationsFirstTime(knownCity, profiles);
+        } else if (!hasCachedData.current) {
+          setError('Could not load air data');
         }
 
-        await setCache(forecastKey, freshForecast, CACHE_TTL.HOURLY_FORECAST);
-        setForecast(freshForecast);
-      }
+        // ── 3b. Handle forecast result ──────────────────────────────────────────
+        if (freshForecast.length > 0) {
+          if (freshAqi) {
+            const diff = freshAqi.aqi - freshForecast[0].aqi;
+            freshForecast.forEach((f, i) => {
+              const decay = Math.max(0, 1 - i / 8);
+              f.aqi = Math.max(0, Math.round(f.aqi + diff * decay));
+            });
+            freshForecast[0].dominantPollutant = freshAqi.dominantPollutant;
+          }
+          await setCache(forecastKey, freshForecast, CACHE_TTL.HOURLY_FORECAST);
+          setForecast(freshForecast);
+        }
 
-      hasCachedData.current = hasCachedData.current || freshAqi !== null;
-      setLoading(false);
+        hasCachedData.current = hasCachedData.current || freshAqi !== null;
+      } catch (e) {
+        console.log('useAQI fetch error:', e);
+        if (!hasCachedData.current) setError('Could not load air data');
+      } finally {
+        setLoading(false);
+      }
     },
     [lat, lng, enabled, city],
   );
