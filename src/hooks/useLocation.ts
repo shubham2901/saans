@@ -39,22 +39,41 @@ async function resolveByGPS(): Promise<{ lat: number; lng: number } | null> {
 }
 
 async function resolveByIP(): Promise<{ lat: number; lng: number; city: string } | null> {
+  // Try ipapi.co first
   try {
     const res  = await fetch('https://ipapi.co/json/');
     const data = await res.json() as {
-      latitude?: number; longitude?: number; city?: string;
+      latitude?: number; longitude?: number; city?: string; error?: boolean;
     };
-    if (data.latitude && data.longitude) {
+    if (!data.error && data.latitude && data.longitude) {
       return {
         lat:  data.latitude,
         lng:  data.longitude,
         city: data.city ?? 'Unknown',
       };
     }
-    return null;
   } catch {
-    return null;
+    // fall through to secondary
   }
+
+  // Secondary: ip-api.com (45 req/min, no key, works on emulators)
+  try {
+    const res  = await fetch('https://ip-api.com/json/');
+    const data = await res.json() as {
+      status?: string; lat?: number; lon?: number; city?: string;
+    };
+    if (data.status === 'success' && data.lat && data.lon) {
+      return {
+        lat:  data.lat,
+        lng:  data.lon,
+        city: data.city ?? 'Unknown',
+      };
+    }
+  } catch {
+    // both failed
+  }
+
+  return null;
 }
 
 export function useLocation() {

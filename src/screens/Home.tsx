@@ -76,8 +76,10 @@ export default function HomeScreen() {
   const [aiLoading, setAiLoading] = React.useState(false);
   const aiFadeAnim = useRef(new Animated.Value(1)).current;
 
-  // showSkeleton: true while location resolving OR waiting for first AQI load
-  const showSkeleton = locLoading || (!current && (aqiLoading || (lat === null && permissionStatus !== 'denied')));
+  // Show skeleton only while actively loading (location resolving, or first AQI fetch with known coords)
+  const showSkeleton = locLoading || (lat !== null && !current && aqiLoading);
+  // Location fully resolved but both GPS and IP fallback failed to get coordinates
+  const showLocationFailed = !locLoading && lat === null && permissionStatus !== 'denied';
   const showError    = !current && !showSkeleton && !!error;
   const showDenied   = permissionStatus === 'denied' && lat === null && !showSkeleton;
 
@@ -206,6 +208,18 @@ export default function HomeScreen() {
             <Text style={styles.errorIcon}>📍</Text>
             <Text style={styles.errorTitle}>Location not enabled</Text>
             <Text style={styles.errorSub}>Enable location in Settings to get real-time local AQI</Text>
+          </View>
+        )}
+
+        {/* ── Location resolution failed (GPS + IP both failed) ── */}
+        {showLocationFailed && (
+          <View style={styles.centerBox}>
+            <Text style={styles.errorIcon}>📍</Text>
+            <Text style={styles.errorTitle}>Couldn't determine location</Text>
+            <Text style={styles.errorSub}>Check your internet connection and try again</Text>
+            <TouchableOpacity onPress={refresh} style={styles.retryBtn} activeOpacity={0.8}>
+              <Text style={styles.retryText}>Try again</Text>
+            </TouchableOpacity>
           </View>
         )}
 
