@@ -12,6 +12,8 @@ import {
 } from '../services/storageService';
 import { getAQIStatus } from '../constants/colors';
 import { scheduleNotificationsFirstTime } from '../services/notificationService';
+import { setWidgetData } from '../services/widgetService';
+import { getHardcodedGuidance } from '../constants/thresholds';
 
 interface UseAQIInput {
   lat: number | null;
@@ -101,6 +103,10 @@ export function useAQI({ lat, lng, enabled, city }: UseAQIInput): UseAQIResult {
 
           const profiles = await getProfiles();
           await scheduleNotificationsFirstTime(knownCity, profiles);
+
+          // Update Android home screen widget (no-op on iOS / Expo Go)
+          const widgetGuidance = getHardcodedGuidance(freshAqi.aqi, profiles);
+          setWidgetData(freshAqi.aqi, knownCity, widgetGuidance);
         } else if (!hasCachedData.current) {
           setError('Could not load air data');
         }

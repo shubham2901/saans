@@ -30,7 +30,8 @@
     },
     "plugins": [
       "expo-asset",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "./plugins/withAndroidWidget"
     ]
   }
 }
