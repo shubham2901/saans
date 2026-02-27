@@ -36,7 +36,7 @@ function formatHour(h: number): string {
   return h < 12 ? `${h}am` : `${h - 12}pm`;
 }
 
-interface BestWindow { label: string; avgAqi: number }
+interface BestWindow { label: string; avgAqi: number; startHour: number }
 
 function findBestWindow(forecast: HourlyForecast[]): BestWindow | null {
   if (forecast.length < 2) return null;
@@ -44,10 +44,17 @@ function findBestWindow(forecast: HourlyForecast[]): BestWindow | null {
   let bestSum = forecast[0].aqi + forecast[1].aqi;
   for (let i = 1; i < forecast.length - 1; i++) {
     const sum = forecast[i].aqi + forecast[i + 1].aqi;
-    if (sum < bestSum) { bestSum = sum; bestIdx = i; }
+    if (sum < bestSum) {
+      bestSum = sum;
+      bestIdx = i;
+    }
   }
   const h = forecast[bestIdx].hour;
-  return { label: `${formatHour(h)} – ${formatHour(h + 2)}`, avgAqi: Math.round(bestSum / 2) };
+  return {
+    label: `${formatHour(h)} – ${formatHour(h + 2)}`,
+    avgAqi: Math.round(bestSum / 2),
+    startHour: h,
+  };
 }
 
 function aqiDotColor(aqi: number): string {
@@ -90,7 +97,7 @@ export default function HomeScreen() {
         city: city ?? 'Unknown',
         profiles,
         hourlyForecast: forecast,
-        bestWindowHour: bestWindow ? Math.floor(bestWindow.avgAqi) : null, // best approximation from available data
+        bestWindowHour: bestWindow ? bestWindow.startHour : null,
         timeOfDay
       }).then(cards => {
         if (cards !== aiGuidance) {
