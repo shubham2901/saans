@@ -73,6 +73,16 @@ function writeNativeFiles(config) {
       ktDir,
     ].forEach((d) => fs.mkdirSync(d, { recursive: true }));
 
+    // Add widget description string resource (required as @string/ reference)
+    const valuesDir = path.join(root, 'app/src/main/res/values');
+    fs.mkdirSync(valuesDir, { recursive: true });
+    const widgetStringsPath = path.join(valuesDir, 'widget_strings.xml');
+    fs.writeFileSync(widgetStringsPath,
+`<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_description">Shows current AQI with health guidance</string>
+</resources>\n`);
+
     // Always overwrite config XMLs (they have no user-editable content)
     fs.writeFileSync(path.join(root, 'app/src/main/res/xml/aqi_widget_info.xml'),
 `<?xml version="1.0" encoding="utf-8"?>
@@ -87,7 +97,7 @@ function writeNativeFiles(config) {
     android:initialLayout="@layout/aqi_widget"
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen"
-    android:description="Saans AQI Widget" />\n`);
+    android:description="@string/widget_description" />\n`);
 
     fs.writeFileSync(path.join(root, 'app/src/main/res/drawable/widget_background.xml'),
 `<?xml version="1.0" encoding="utf-8"?>
