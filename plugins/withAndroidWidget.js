@@ -43,7 +43,7 @@ function addWidgetToManifest(config) {
           {
             action: [
               { $: { 'android:name': 'android.appwidget.action.APPWIDGET_UPDATE' } },
-              { $: { 'android:name': 'com.yourname.saans.WIDGET_REFRESH' } },
+              { $: { 'android:name': 'com.shubham.saans.WIDGET_REFRESH' } },
             ],
           },
         ],
@@ -73,7 +73,7 @@ function addWidgetPackage(config) {
     // Add import
     src = src.replace(
       'import com.facebook.react.ReactPackage',
-      'import com.facebook.react.ReactPackage\nimport com.yourname.saans.WidgetDataPackage',
+      'import com.facebook.react.ReactPackage\nimport com.shubham.saans.WidgetDataPackage',
     );
 
     // Register in getPackages()

@@ -13,10 +13,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.yourname.saans"
+      "bundleIdentifier": "com.shubham.saans"
     },
     "android": {
-      "package": "com.yourname.saans",
+      "package": "com.shubham.saans",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -32,6 +32,11 @@
       "expo-asset",
       "@react-native-community/datetimepicker",
       "./plugins/withAndroidWidget"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "8da02c65-609a-4b02-8032-3f10d39b30f4"
+      }
+    }
   }
 }
