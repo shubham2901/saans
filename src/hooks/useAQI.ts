@@ -102,7 +102,13 @@ export function useAQI({ lat, lng, enabled, city }: UseAQIInput): UseAQIResult {
           await saveLastKnownAQI(freshAqi.aqi, knownCity);
 
           const profiles = await getProfiles();
-          await scheduleNotificationsFirstTime(knownCity, profiles);
+
+          // Notifications are best-effort — never let scheduling errors abort the AQI data flow
+          try {
+            await scheduleNotificationsFirstTime(knownCity, profiles);
+          } catch (notifErr) {
+            console.log('Notification scheduling skipped (non-fatal):', notifErr);
+          }
 
           // Update Android home screen widget (no-op on iOS / Expo Go)
           const widgetGuidance = getHardcodedGuidance(freshAqi.aqi, profiles);

@@ -36,7 +36,7 @@ export const claudeService = {
     // Use narrower AQI buckets (round to nearest 3) to be more sensitive to small changes.
     const roundedAqi = Math.round(aqi / 3) * 3;
 
-    const cacheKey = `guidance_v2_${date}_${roundedAqi}_${profilesHash}`;
+    const cacheKey = `guidance_v3_${date}_${roundedAqi}_${profilesHash}`;
 
     // 1. Check local TTL cache
     if (!bust) {
@@ -71,10 +71,13 @@ Rules:
   * "Keep the kids indoors today."
   * "Great morning for your run."
   * "Skip the park — air is bad."
-- detail field: MAX 10 words. One punchy fact or analogy. No full sentences. Examples:
-  * "Like smoking half a cigarette outside."
-  * "Can trigger coughs in sensitive lungs."
-  * "Dust levels are unusually high right now."
+- detail field: 15–25 words. One specific health repercussion — either short-term (what happens today) or long-term (what repeated exposure causes). Be concrete and human, not vague. Examples:
+  * Short-term: "Fine particles enter your bloodstream within minutes, straining your heart and raising blood pressure."
+  * Short-term: "Eyes and throat start burning after 2 hours outside at this level."
+  * Long-term: "Children breathing this daily develop measurably smaller lungs by age 10."
+  * Long-term: "Months of exposure at this level raises heart attack risk by 20%."
+  * Analogy: "Breathing outside today is equivalent to smoking 3 cigarettes over the day."
+  * Choose short-term for AQI above 150. Choose long-term or analogy for AQI 50–150.
 - Return ONLY a JSON array. No markdown. No explanation.`;
 
       const userPrompt = `City: ${params.city}
