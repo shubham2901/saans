@@ -68,13 +68,13 @@ Rules:
 - No Redundant Labels: Do NOT start with "Kids:", "Everyone:", etc.
 - Standard Emojis: 👤 (self), 👶 (kid), 👴 (elderly), 🏃 (runner), 🫁 (asthma), 🌍 (everyone).
 - message field: MAX 8 words. One sharp action or verdict. Examples:
-  * "Keep the kids indoors today."
+  * "Use masks for kids to avoid long term effects."
   * "Great morning for your run."
   * "Skip the park — air is bad."
 - detail field: 15–25 words. One specific health repercussion — either short-term (what happens today) or long-term (what repeated exposure causes). Be concrete and human, not vague. Examples:
   * Short-term: "Fine particles enter your bloodstream within minutes, straining your heart and raising blood pressure."
   * Short-term: "Eyes and throat start burning after 2 hours outside at this level."
-  * Long-term: "Children breathing this daily develop measurably smaller lungs by age 10."
+  * Long-term: "Children's lungs shrink by X% if they breathe this daily."
   * Long-term: "Months of exposure at this level raises heart attack risk by 20%."
   * Analogy: "Breathing outside today is equivalent to smoking 3 cigarettes over the day."
   * Choose short-term for AQI above 150. Choose long-term or analogy for AQI 50–150.
